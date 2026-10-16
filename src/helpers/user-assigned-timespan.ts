@@ -56,6 +56,36 @@ export async function getAssignmentPeriods(octokit: ContextPlugin["octokit"], is
   return userAssignments;
 }
 
+export function hasHumanCollaboratorApproval(
+  comment: Awaited<ReturnType<IssueActivity["getAllComments"]>>[0],
+  assignments: AssignmentPeriod[],
+  context: ContextPlugin
+): boolean {
+  const currentUser = comment.user?.login;
+  
+  // Admins bypass this check
+  if (context.config.incentives?.collaboratorOnlyPaymentInvocation === false) {
+    return true;
+  }
+
+  // Check if any non-author human collaborator interacted
+  return assignments.some(period => {
+    const assignees = Object.keys(period);
+    return assignees.some(assignee => 
+      assignee !== currentUser && 
+      isHumanCollaborator(assignee, context)
+    );
+  });
+}
+
+function isHumanCollaborator(username: string, context: ContextPlugin): boolean {
+  const specialUsers = context.config.incentives?.specialUsers || [];
+  const isSpecialUser = specialUsers.some(group => 
+    group.includes(username)
+  );
+  return !isSpecialUser;
+}
+
 export function isCommentDuringAssignment(
   comment: Awaited<ReturnType<IssueActivity["getAllComments"]>>[0],
   assignments: AssignmentPeriod[],
